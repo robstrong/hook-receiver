@@ -1,0 +1,17 @@
+{
+    "port": 2727,
+    "cidr_override": [
+        "127.0.0.0/22"
+    ],
+    "rules": [
+        {
+            "command": "ls -l",
+            "criteria": [
+                {
+                    "type": "push",
+                    "owner": "Pica9"
+                }
+            ]
+        }
+    ]
+}
