@@ -28,7 +28,7 @@ func main() {
     fmt.Println("CIDRs: ", CIDRs)
 
     http.HandleFunc("/", requestHandler)
-    fmt.Println("Starting server")
+    fmt.Printf("Starting server on port %d\n", config.Port)
 
     log.Fatal(http.ListenAndServe(":"+strconv.Itoa(config.Port), nil))
 }
@@ -43,9 +43,10 @@ func requestHandler(w http.ResponseWriter, r *http.Request) {
             fmt.Printf("Invalid payload\n")
         } else {
             runEvents(payload)
+            fmt.Fprint(w, "WebHook Received")
         }
     } else {
-        fmt.Fprint(w, "Reeeeee-jected!!!")
+        fmt.Fprint(w, "Reeeeeejected!!!")
     }
 }
 
@@ -76,7 +77,8 @@ func formatPayload(req *http.Request) (payload Payload, err error) {
     var jsonBody struct {
         Repository struct {
             Owner struct {
-                Name string
+                Login string //these two hold the same data, but the push event format is different
+                Name  string //from all the other events
             }
             Name string
         }
@@ -94,8 +96,12 @@ func formatPayload(req *http.Request) (payload Payload, err error) {
 
     payload.Type = req.Header.Get("X-Github-Event")
     payload.Owner = jsonBody.Repository.Owner.Name
+    if payload.Owner == "" {
+        payload.Owner = jsonBody.Repository.Owner.Login
+    }
     payload.Repository = jsonBody.Repository.Name
-    fmt.Println("Payload: ", payload)
+    json, err := json.Marshal(payload)
+    fmt.Println("Payload: ", string(json))
 
     return
 }
@@ -107,17 +113,14 @@ Rule:
         for _, criteria := range rule.Criteria {
             //check that types match
             if criteria.Type != "" && payload.Type != criteria.Type {
-                fmt.Println("Types don't match")
                 continue Rule
             }
             //check that owners match
             if criteria.Owner != "" && payload.Owner != criteria.Owner {
-                fmt.Println("Owners don't match")
                 continue Rule
             }
             //check that repo names match
             if criteria.Repository != "" && payload.Repository != criteria.Repository {
-                fmt.Println("Repos don't match")
                 continue Rule
             }
 
@@ -126,6 +129,12 @@ Rule:
             if err != nil {
                 fmt.Printf("Command Error:\n    %s\n", err)
             } else {
+                //format the output
+                output := string(output)
+                if strings.HasSuffix(output, "\n") {
+                    output = output[:len(output)-1]
+                }
+                output = "    " + strings.Replace(string(output), "\n", "\n    ", -1) + "\n"
                 fmt.Printf("Command output:\n%s", output)
             }
         }
@@ -142,11 +151,14 @@ func runCommand(cmd string) (output []byte, err error) {
 }
 
 func parseCIDRs(cidrs []string) []*net.IPNet {
+    if len(cidrs) == 0 {
+        log.Fatal("No CIDRs specified")
+    }
     cidrNet := make([]*net.IPNet, 0)
     for _, cidr := range cidrs {
         _, netCidr, err := net.ParseCIDR(cidr)
         if err != nil {
-            log.Fatal("Invalid Github CIDR: ", err)
+            log.Fatal(err)
         }
         cidrNet = append(cidrNet, netCidr)
     }
