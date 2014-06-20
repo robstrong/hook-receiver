@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	hookHandler := HookHandler{loadConfig("config.json")}
+	hookHandler := HookHandler{LoadConfig("config.json")}
 
 	http.Handle("/", hookHandler)
 	fmt.Printf("Starting server on port %d\n", hookHandler.Config.Port)

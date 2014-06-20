@@ -28,7 +28,7 @@ type Criteria struct {
 	Repository string
 }
 
-func loadConfig(fileName string) Config {
+func LoadConfig(fileName string) Config {
 	file, err := os.Open(fileName)
 	if err != nil {
 		log.Fatal("Error loading config file: ", err)

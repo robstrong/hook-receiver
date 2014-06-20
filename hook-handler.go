@@ -14,10 +14,7 @@ type HookHandler struct {
 }
 
 func (h HookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ipParts := strings.Split(r.RemoteAddr, ":")
-	ip := net.ParseIP(ipParts[0])
-
-	if h.isValidIp(ip) {
+	if h.isValidIp(r.RemoteAddr) {
 		payload, err := formatPayload(r)
 		if err != nil {
 			fmt.Printf("Invalid payload\n")
@@ -87,7 +84,11 @@ func parseCIDRs(cidrs []string) []*net.IPNet {
 	return cidrNet
 }
 
-func (h HookHandler) isValidIp(ip net.IP) bool {
+func (h HookHandler) isValidIp(addr string) bool {
+
+	ipParts := strings.Split(addr, ":")
+	ip := net.ParseIP(ipParts[0])
+
 	for _, cidr := range h.Config.CIDRs {
 		if cidr.Contains(ip) {
 			return true
