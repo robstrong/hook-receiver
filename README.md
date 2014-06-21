@@ -1,4 +1,4 @@
-## Github WebHook Receiver and Command 
+## Github WebHook Receiver and Command Runner
 This project is a simple web server which will receive Github WebHooks and then run a command based on the payload. 
 
 ### Config
