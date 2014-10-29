@@ -1,0 +1,3 @@
+#!/bin/bash
+
+GOARCH=amd64 GOOS=linux go build -tags hook-receiver -ldflags '-s' -o bin/hook-receiver-linux-amd64 .
