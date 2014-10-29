@@ -1,3 +1,3 @@
 {
-    "build_script": "docker build -t hook-receiver:{{.Revision}} ."
+    "build_scripts": ["docker build -t hook-receiver:{{.Revision}} ."]
 }
