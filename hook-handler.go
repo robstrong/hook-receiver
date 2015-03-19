@@ -27,16 +27,12 @@ func (h HookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.handlePayload(payload)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	go h.handlePayload(payload)
 
 	fmt.Fprint(w, "WebHook Received")
 }
 
-func (h HookHandler) handlePayload(payload Payload) error {
+func (h HookHandler) handlePayload(payload Payload) {
 	//check if payload matches any of the rules
 Rule:
 	for _, rule := range h.Config.Rules {
@@ -60,7 +56,6 @@ Rule:
 			fmt.Printf("Command output:\n%s", outputStr)
 		}
 	}
-	return nil
 }
 
 func runCommand(cmd string, payload Payload) (output []byte, err error) {
