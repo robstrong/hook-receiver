@@ -2,46 +2,104 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
 	"io/ioutil"
 	"net/http"
+	"regexp"
+	"strings"
 )
 
-type Payload struct {
-	Type       string
-	Owner      string
-	Repository string
+//go:generate gojson -input=github-events/push.json -name=PushEvent -o=push_event.go
+//go:generate gojson -input=github-events/release.json -name=ReleaseEvent -o=release_event.go
+
+type Payload interface {
+	IsMatch(Criteria) bool
+	Type() string
 }
 
-func formatPayload(req *http.Request) (payload Payload, err error) {
-	var jsonBody struct {
-		Repository struct {
-			Owner struct {
-				Login string //these two hold the same data, but the push event format is different
-				Name  string //from all the other events
-			}
-			Name string
-		}
-	}
+func parsePayload(req *http.Request) (Payload, error) {
 	defer req.Body.Close()
 	body, err := ioutil.ReadAll(req.Body)
 	if err != nil {
-		return
+		return PushEvent{}, err
 	}
 
-	err = json.Unmarshal(body, &jsonBody)
-	if err != nil {
-		return
-	}
+	event := req.Header.Get("X-Github-Event")
 
-	payload.Type = req.Header.Get("X-Github-Event")
-	payload.Owner = jsonBody.Repository.Owner.Name
-	if payload.Owner == "" {
-		payload.Owner = jsonBody.Repository.Owner.Login
+	switch event {
+	case "push":
+		pushEvent := PushEvent{}
+		err = json.Unmarshal(body, &pushEvent)
+		return pushEvent, err
+	case "release":
+		releaseEvent := ReleaseEvent{}
+		err = json.Unmarshal(body, &releaseEvent)
+		return releaseEvent, err
+	default:
+		return PushEvent{}, errors.New("invalid event type: " + event)
 	}
-	payload.Repository = jsonBody.Repository.Name
-	json, err := json.Marshal(payload)
-	fmt.Println("Payload: ", string(json))
+}
 
-	return
+func (e PushEvent) Type() string {
+	return "push"
+}
+func (e PushEvent) Branch() string {
+	if strings.HasPrefix(e.Ref, "refs/heads/") {
+		return e.Ref[11:]
+	}
+	return ""
+}
+func (e PushEvent) Tag() string {
+	if strings.HasPrefix(e.Ref, "refs/tags/") {
+		return e.Ref[10:]
+	}
+	return ""
+}
+func (e PushEvent) IsMatch(c Criteria) bool {
+	//check that types match
+	if e.Type() != c.Event {
+		return false
+	}
+	//check that owners match
+	if c.Owner != "" && e.Repository.Owner.Name != c.Owner {
+		return false
+	}
+	//check that repo names match
+	if c.Repository != "" && e.Repository.Name != c.Repository {
+		return false
+	}
+	//check that branch matches
+	if c.PushParams.Branch != "" {
+		matched, err := regexp.MatchString("refs/heads/"+c.PushParams.Branch, e.Ref)
+		if err != nil {
+			return false
+		}
+		if !matched {
+			return false
+		}
+	}
+	return true
+}
+
+func (e ReleaseEvent) Type() string {
+	return "release"
+}
+func (e ReleaseEvent) IsMatch(c Criteria) bool {
+	//check that types match
+	if e.Type() != c.Event {
+		return false
+	}
+	//check that owners match
+	if c.Owner != "" && e.Repository.Owner.Login != c.Owner {
+		return false
+	}
+	//check that repo names match
+	if c.Repository != "" && e.Repository.Name != c.Repository {
+		return false
+	}
+	//check that prerelease matches
+	if c.ReleaseParams.Prerelease != nil && *c.ReleaseParams.Prerelease != e.Release.Prerelease {
+		return false
+	}
+	return true
 }

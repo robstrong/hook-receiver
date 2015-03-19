@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"net"
 	"net/http"
 	"os/exec"
 	"strings"
+	"text/template"
 )
 
 type HookHandler struct {
@@ -14,38 +16,38 @@ type HookHandler struct {
 }
 
 func (h HookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if h.isValidIp(r.RemoteAddr) {
-		payload, err := formatPayload(r)
-		if err != nil {
-			fmt.Printf("Invalid payload\n")
-		} else {
-			h.runEvents(payload)
-			fmt.Fprint(w, "WebHook Received")
-		}
-	} else {
-		fmt.Fprint(w, "Reeeeeejected!!!")
+	if !h.isValidIp(r.RemoteAddr) {
+		fmt.Fprint(w, "Rejected!!!")
+		return
 	}
+
+	payload, err := parsePayload(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	err = h.handlePayload(payload)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Fprint(w, "WebHook Received")
 }
-func (h HookHandler) runEvents(payload Payload) {
+
+func (h HookHandler) handlePayload(payload Payload) error {
 	//check if payload matches any of the rules
 Rule:
 	for _, rule := range h.Config.Rules {
 		for _, criteria := range rule.Criteria {
-			//check that types match
-			if criteria.Type != "" && payload.Type != criteria.Type {
-				continue Rule
-			}
-			//check that owners match
-			if criteria.Owner != "" && payload.Owner != criteria.Owner {
-				continue Rule
-			}
-			//check that repo names match
-			if criteria.Repository != "" && payload.Repository != criteria.Repository {
+
+			if !payload.IsMatch(criteria) {
 				continue Rule
 			}
 
 			//we have a matching rule, run the command
-			output, err := runCommand(rule.Command)
+			output, err := runCommand(rule.Command, payload)
 			if err != nil {
 				fmt.Printf("Command Error:\n    %s\n", err)
 			}
@@ -58,15 +60,35 @@ Rule:
 			fmt.Printf("Command output:\n%s", outputStr)
 		}
 	}
+	return nil
 }
 
-func runCommand(cmd string) (output []byte, err error) {
-	parts := strings.Fields(cmd)
+func runCommand(cmd string, payload Payload) (output []byte, err error) {
+
+	parsed, err := parseCommand(cmd, payload)
+	if err != nil {
+		return
+	}
+
+	parts := strings.Fields(parsed)
 	head := parts[0]
 	parts = parts[1:len(parts)]
 
 	output, err = exec.Command(head, parts...).CombinedOutput()
 	return
+}
+
+func parseCommand(cmd string, payload Payload) (string, error) {
+	tmpl, err := template.New(cmd).Parse(cmd)
+	if err != nil {
+		return "", err
+	}
+	out := bytes.NewBuffer(make([]byte, 0))
+	err = tmpl.Execute(out, payload)
+	if err != nil {
+		return "", err
+	}
+	return out.String(), nil
 }
 
 func parseCIDRs(cidrs []string) []*net.IPNet {

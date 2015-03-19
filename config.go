@@ -23,9 +23,15 @@ type Rule struct {
 }
 
 type Criteria struct {
-	Type       string
+	Event      string
 	Owner      string
 	Repository string
+	PushParams struct {
+		Branch string
+	}
+	ReleaseParams struct {
+		Prerelease *bool
+	}
 }
 
 func LoadConfig(fileName string) Config {
