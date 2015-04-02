@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net"
@@ -28,20 +29,25 @@ type Criteria struct {
 	Repository string
 	PushParams struct {
 		Branch string
-	}
+	} `json:"push_params"`
 	ReleaseParams struct {
 		Prerelease *bool
-	}
+	} `json:"release_params"`
 }
 
 func LoadConfig(fileName string) Config {
 	file, err := os.Open(fileName)
+	defer file.Close()
 	if err != nil {
 		log.Fatal("Error loading config file: ", err)
 	}
-	decoder := json.NewDecoder(file)
+	return getConfigFromReader(file)
+}
+
+func getConfigFromReader(r io.Reader) Config {
+	decoder := json.NewDecoder(r)
 	config := Config{}
-	err = decoder.Decode(&config)
+	err := decoder.Decode(&config)
 	if err != nil {
 		log.Fatal("Invalid config file: ", err)
 	}
