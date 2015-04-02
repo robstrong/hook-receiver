@@ -83,4 +83,12 @@ func TestParseConfigAndMatch(t *testing.T) {
 	assert.Equal(t, "echo test", config.Rules[0].Command, "Command not parsed correctly")
 	assert.Equal(t, 1, len(config.Rules[0].Criteria), "Criteria not parsed correctly")
 	assert.Equal(t, "release-4.17.0", config.Rules[0].Criteria[0].PushParams.Branch, "Branch not parsed correctly")
+
+	e := PushEvent{}
+	e.Repository.Name = "cd-core"
+	e.Repository.Owner.Name = "Pica9"
+	e.Ref = "refs/heads/release-4.16.0"
+	assert.Equal(t, e.IsMatch(config.Rules[0].Criteria[0]), false, "Did not expect a match")
+	e.Ref = "refs/heads/release-4.17.0"
+	assert.Equal(t, e.IsMatch(config.Rules[0].Criteria[0]), true, "Expected a match")
 }
