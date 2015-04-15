@@ -11,6 +11,7 @@ import (
 
 //go:generate gojson -input=github-events/push.json -name=PushEvent -o=push_event.go
 //go:generate gojson -input=github-events/release.json -name=ReleaseEvent -o=release_event.go
+//go:generate gojson -input=github-events/issues.json -name=IssuesEvent -o=issues_event.go
 
 type Payload interface {
 	IsMatch(Criteria) bool
@@ -35,6 +36,10 @@ func parsePayload(req *http.Request) (Payload, error) {
 		releaseEvent := ReleaseEvent{}
 		err = json.Unmarshal(body, &releaseEvent)
 		return releaseEvent, err
+	case "issues":
+		issuesEvent := IssuesEvent{}
+		err = json.Unmarshal(body, &issuesEvent)
+		return issuesEvent, err
 	default:
 		return PushEvent{}, errors.New("invalid event type: " + event)
 	}
@@ -99,6 +104,25 @@ func (e ReleaseEvent) IsMatch(c Criteria) bool {
 	}
 	//check that prerelease matches
 	if c.ReleaseParams.Prerelease != nil && *c.ReleaseParams.Prerelease != e.Release.Prerelease {
+		return false
+	}
+	return true
+}
+
+func (e IssuesEvent) Type() string {
+	return "issues"
+}
+func (e IssuesEvent) IsMatch(c Criteria) bool {
+	//check that types match
+	if e.Type() != c.Event {
+		return false
+	}
+	//check that owners match
+	if c.Owner != "" && e.Repository.Owner.Login != c.Owner {
+		return false
+	}
+	//check that repo names match
+	if c.Repository != "" && e.Repository.Name != c.Repository {
 		return false
 	}
 	return true
