@@ -12,3 +12,26 @@ When the server starts, it reads from `config.json` which should be located in t
 | `rules[][criteria][][repository]` | no | Name of repository |
 | `rules[][command]` | yes | Command to run if the criteria matches |
 | `cidr_override` | no | All requests received by the server are checked to make sure the requesting IP matches the given CIDR. If `cidr_override` is not specified, Github's CIDR is used |
+
+### Templating
+
+The command that is run will be evaluated as a template. The payload data will be passed to the template. So you can use
+data from the Github hook in your command. For example, if you received a push event, you could setup a command like this:
+
+```
+"fabric deploy_branch:{{.Branch}}
+```
+
+You can see what data is available in the *action*_event.go (push_event.go, release_event.go, etc).
+
+#### Functions
+
+Currently there is only one template function:
+
+__after__ - will return the string that comes after the string that is passed in
+
+If Branch = "release-myNewFeature"
+```
+{{ .Branch | after "release-" }}
+```
+Would output "myNewFeature"

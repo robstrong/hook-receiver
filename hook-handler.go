@@ -11,6 +11,16 @@ import (
 	"text/template"
 )
 
+var templateFuncs = template.FuncMap{
+	"after": func(find, s string) string {
+		idx := strings.LastIndex(s, find)
+		if idx == -1 {
+			return s
+		}
+		return s[idx+len(find):]
+	},
+}
+
 type HookHandler struct {
 	Config Config
 }
@@ -74,7 +84,7 @@ func runCommand(cmd string, payload Payload) (output []byte, err error) {
 }
 
 func parseCommand(cmd string, payload Payload) (string, error) {
-	tmpl, err := template.New(cmd).Parse(cmd)
+	tmpl, err := template.New(cmd).Funcs(templateFuncs).Parse(cmd)
 	if err != nil {
 		return "", err
 	}
