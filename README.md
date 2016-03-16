@@ -13,6 +13,51 @@ When the server starts, it reads from `config.json` which should be located in t
 | `rules[][command]` | yes | Command to run if the criteria matches |
 | `cidr_override` | no | All requests received by the server are checked to make sure the requesting IP matches the given CIDR. If `cidr_override` is not specified, Github's CIDR is used |
 
+### Example Config
+
+```json
+{
+    "port": 8000,
+    "rules": [
+        {
+            "_comments": "Update the Satis packages whenever code is pushed to a robstrong repo",
+            "command": "php /opt/satis/bin/satis build /opt/satis/satis.json /srv/www -n",
+            "criteria": [
+                {
+                    "event": "push",
+                    "owner": "robstrong"
+                }
+            ]
+        },
+        {
+            "_comments": "Update the issues page when an issue is updated/created",
+            "command": "/opt/github-history/go-gh-history -o /srv/www/issues.html issues robstrong/hook-receiver",
+            "criteria": [
+                {
+                    "event": "issues",
+                    "owner": "robstrong",
+                    "repository": "hook-receiver"
+                }
+            ]
+        },
+        {
+            "_comments": "Pull down branches starting with 'release-' locally when pushed",
+            "command": "cd ~/go-github-history/ && git checkout {{ .Branch }} && git pull origin {{ .Branch }}",
+            "criteria": [
+                {
+                    "event": "push",
+                    "owner": "robstrong",
+                    "repository": "go-github-history",
+                    "push_params": {
+                        "branch": "release-*"
+                    }
+                }
+            ]
+        }
+    ]
+}
+```
+
 ### Templating
 
 The command that is run will be evaluated as a template. The payload data will be passed to the template. So you can use
